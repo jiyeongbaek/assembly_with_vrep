@@ -1,0 +1,31 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/jiyeong/catkin_ws/devel/lib/python2.7/dist-packages",
+        "/opt/ros/kinetic/lib/python2.7/dist-packages",
+        "/opt/openrobots/lib/python2.7/site-packages"
+    ],
+    "files.associations": {
+        "cctype": "cpp",
+        "cmath": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "atomic": "cpp",
+        "strstream": "cpp",
+        "chrono": "cpp",
+        "cstdint": "cpp",
+        "initializer_list": "cpp",
+        "iosfwd": "cpp",
+        "ratio": "cpp",
+        "thread": "cpp",
+        "typeindex": "cpp",
+        "optional": "cpp",
+        "cwctype": "cpp",
+        "mutex": "cpp",
+        "system_error": "cpp"
+    }
+}
