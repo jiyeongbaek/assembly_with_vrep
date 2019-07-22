@@ -72,7 +72,7 @@ bool rrt::StartRRT2(Robotmodel& model, std::ostream& sout) {
 		}
 		iter++;
 	}
-	std::cout << "okay here" << std::endl;
+
 	if (finished) {
 		path = tree.getPath();
 		vector<vector<double>> p2;
@@ -173,6 +173,9 @@ bool rrt::StartCRRT(Robotmodel& model, std::ostream& sout) {
 
 			sout << node[node.size() - 1] << "\n";
 		}
+
+				cout<<"path.size()" << path.size()<<endl;
+
 	}
 	else {
 		return false;
@@ -182,7 +185,7 @@ bool rrt::StartCRRT(Robotmodel& model, std::ostream& sout) {
 }
 std::vector<double> rrt::RandomConfig() {
 	double goalb = (double)rand() / RAND_MAX;
-	if (goalb < 0.5) {
+	if (goalb < 0.1) {
 		isGoal = true;
 		return g2;
 	} // goal bias�� ���� ���� ���żӵ��� �������ٳ�!
@@ -370,8 +373,9 @@ bool rrt::ProjectConfig(Robotmodel model, std::vector<double> qold, std::vector<
 	// Tc
 	Matrix4d T0_c, T0_obj, Tc_obj;
 	T0_c.setIdentity();
-	T0_c.topRightCorner(3, 1) = Vector3d(0.80, -0.25, 0.95);
+	T0_c.topRightCorner(3, 1) = model.refer_pos;
 //	T0_c.topRightCorner(3, 1) = Vector3d(0.8750, -0.175, 0.95);
+//	T0_c.topLeftCorner(3,3) = model.refer_rot;
 
 
 	MatrixXd J_temp(6, DoF_size), J(6, DoF_size), eye(6, 6);
@@ -381,7 +385,7 @@ bool rrt::ProjectConfig(Robotmodel model, std::vector<double> qold, std::vector<
 	Vector3d phi;
 	Vector3d s[3], v[3], w[3];
 	Matrix3d Rotd;
-	Rotd = Rotate_with_Z(0.0)*Rotate_with_Y(-M_PI / 2.0)*Rotate_with_Z(-M_PI / 4.0);
+	Rotd = model.refer_rot;
 	for (int i = 0; i < DoF_size; i++) {// deg -> rad
 		qs[i] = qs[i] * M_PI / 180.0;
 		qold[i] = qold[i] * M_PI / 180.0;
@@ -413,7 +417,7 @@ bool rrt::ProjectConfig(Robotmodel model, std::vector<double> qold, std::vector<
 				dx(i) = 0.0;
 		}
 	//	dx(0) = 0.0;
-		dx(1) = 0.0;
+	//	dx(1) = 0.0;
 		dx(2) = 0.0;
 
 
@@ -430,7 +434,7 @@ bool rrt::ProjectConfig(Robotmodel model, std::vector<double> qold, std::vector<
 		// Algorithm 4 - line 3
 		if (dx.norm() < 0.01) {
 		//	cout << dx.transpose() << endl;
-			cout << pos_temp.transpose() << endl;
+	//		cout << Rot_temp.transpose() << endl;
 			flag = true;
 			break;
 		}
@@ -663,11 +667,11 @@ bool rrt::checkCollision3(Robotmodel model, std::vector<double> &config) {
 	}
 	else {
 		Matrix3d Rot_temp = model.Rot*Rot_arm(model.q);// end-effector
-		// Box2[0].vAxis[0] = Rot_temp.col(0);
-		// Box2[0].vAxis[1] = Rot_temp.col(1);
-		// Box2[0].vAxis[2] = Rot_temp.col(2);
-		// Box2[0].fAxis = Vector3d(0.02, 0.02, 0.02);
-		// Box2[0].vPos = CalcBodyToBaseCoordinates(*model.model, model.q, model.body_id[dof-1], model.com_id[dof-1] , true);
+		Box2[0].vAxis[0] = Rot_temp.col(0);
+		Box2[0].vAxis[1] = Rot_temp.col(1);
+		Box2[0].vAxis[2] = Rot_temp.col(2);
+		Box2[0].fAxis = Vector3d(0.05, 0.05, 0.05);
+		Box2[0].vPos = CalcBodyToBaseCoordinates(*model.model, model.q, model.body_id[dof-1], model.com_id[dof-1] , true);
 	
 		// mlik scenario 
 		// Matrix3d Rot_temp2 = model.Rot*Rot_arm_link5(model.q); // link 5
@@ -698,10 +702,10 @@ bool rrt::checkCollision3(Robotmodel model, std::vector<double> &config) {
 
 
 		// door scenario 
-		Box2[0].vAxis[0] = Vector3d(1, 0, 0);
-		Box2[0].vAxis[1] = Vector3d(0, 1, 0);
-		Box2[0].vAxis[2] = Vector3d(0, 0, 1);
-		Box2[0].vPos = Vector3d(0.2590, 0.2144, 0.9026);
+		// Box2[0].vAxis[0] = Vector3d(1, 0, 0);
+		// Box2[0].vAxis[1] = Vector3d(0, 1, 0);
+		// Box2[0].vAxis[2] = Vector3d(0, 0, 1);
+		// Box2[0].vPos = Vector3d(0.2590, 0.2144, 0.9026);
 
 		// Box2[1].vAxis[0] = Vector3d(1, 0, 0);
 		// Box2[1].vAxis[1] = Vector3d(0, 1, 0);

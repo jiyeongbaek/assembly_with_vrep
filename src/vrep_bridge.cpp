@@ -55,6 +55,7 @@ VrepBridge::VrepBridge(ros::NodeHandle nh_,double hz_):
     vrep_sim_stop_pub_ = nh_.advertise<std_msgs::Bool>("/stopSimulation", 5);
     vrep_sim_step_trigger_pub_ = nh_.advertise<std_msgs::Bool>("/triggerNextStep", 100);
     vrep_sim_enable_syncmode_pub_ = nh_.advertise<std_msgs::Bool>("/enableSyncMode", 5);
+    vrep_success_pub_ = nh_.advertise<std_msgs::Int32>("/success", 5);
 
     // Queue_size = 발행하는 메세지를 몇 개까지 저장해 둘 것인지
     vrep_ljoint_set_pub_ = nh_.advertise<sensor_msgs::JointState>("/panda/left_joint_set", 1);
@@ -120,6 +121,7 @@ VrepBridge::VrepBridge(ros::NodeHandle nh_,double hz_):
     vrep_ljoint_set_pub_.publish(ljoint_cmd_);
 	  // vrep_rjoint_set_pub_.publish(rjoint_cmd_);
     vrep_gripper_set_pub.publish(gripper_cmd_);
+    
     vrepStepTrigger();
   }
 
@@ -149,10 +151,10 @@ VrepBridge::VrepBridge(ros::NodeHandle nh_,double hz_):
     ROS_INFO("Starting V-REP Simulation");
     std_msgs::Bool msg;
     msg.data = true;
-    std_msgs::Bool msg2;
-    msg2.data=false;
+    // std_msgs::Bool msg2;
+    // msg2.data=false;
     vrep_sim_start_pub_.publish(msg);
-    vrep_sim_enable_syncmode_pub_.publish(msg2);
+    // vrep_sim_enable_syncmode_pub_.publish(msg2);
   }
   void VrepBridge::vrepStop()
   {
@@ -175,3 +177,9 @@ VrepBridge::VrepBridge(ros::NodeHandle nh_,double hz_):
     vrep_sim_enable_syncmode_pub_.publish(msg);
   }
 
+  void VrepBridge::success(std_msgs::Int32 msg)
+  {
+    vrep_success_pub_.publish(msg);
+  }
+
+  

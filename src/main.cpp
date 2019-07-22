@@ -2,40 +2,35 @@
 #include <string>
 #include "vrep_bridge.hpp"
 #include "controller.h"
-
+#include <std_msgs/Int32.h>
 #include <sensor_msgs/JointState.h>
-
 // for vrep keyboard event
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
 using namespace std;
+std::string state_;
 
-bool _kbhit()
-{
-    termios term;
-    tcgetattr(0, &term);
+void state_cb(const std_msgs::String::ConstPtr& msg)
+  {
+	
+    state_ = msg->data;
 
-    termios term2 = term;
-    term2.c_lflag &= ~ICANON;
-    tcsetattr(0, TCSANOW, &term2);
+  }
+static constexpr uint32_t HashCode(const char *p) {
 
-    int byteswaiting;
-    ioctl(0, FIONREAD, &byteswaiting);
+    return *p ? static_cast<uint32_t>(*p) + 33 * HashCode(p + 1) :  5381;
 
-    tcsetattr(0, TCSANOW, &term);
-
-    return byteswaiting > 0;
-}
-
+  }
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "assembly_vrep");
 	ros::NodeHandle nh("~");
-	
 	const double hz = 100;
 	VrepBridge vb(nh, hz);
+	
+	ros::Subscriber state_trans_sub = nh.subscribe("/assembly/state_transition", 100, &state_cb);
 	
 	Controller ac(nh);
 	nh.param("urdf_param", ac.urdf_param, std::string("/robot_description"));
@@ -50,71 +45,83 @@ int main(int argc, char** argv)
 
 	bool isSimulationRun = true;
 	bool exitFlag = false;	
-
-	//ros::Publisher desired_joint_pub = nh.advertise<sensor_msgs::JointState>("/desired_joint_", 100);
+	std_msgs::Int32 msg;
+	
 	while (ros::ok() && !exitFlag)
 	{
 		vb.read_vrep();
 		ac.readdata(vb.current_ql_, vb.current_ql_dot_);
-		
-		if (_kbhit())
+		//cout << state_ << endl;
+		uint32_t hash = HashCode(state_.c_str());
+		switch (hash)
 		{
-			int key = getchar();
-			switch (key)
-			{
-			case 'i':
-				cout << "Initial Posture (Joint Space)" << endl;
-				ac.setMode(Controller::INIT);
-				
+			case HashCode("grasp"): // go to short part1
+				ROS_INFO("GRASPING");
+				vb.desired_grisping_l = 0.00;
 				break;
-			case '1':
-				cout << "Approach1" << endl;
+			case HashCode("open"): // go to short part1
+				ROS_INFO("Gripper Open");
+				vb.desired_grisping_l = 0.04;
+				break;
+			case HashCode("attach"): // go to short part1
+				ROS_INFO("Attach Object");
+				vb.success(msg);
+				break;
+			case HashCode("detach"): // go to short part1
+				ROS_INFO("Detach Object");
+				vb.success(msg);
+				break;
+
+			case HashCode("approach1-1"): // go to short part1
+				ROS_INFO("APPROACH1");
 				ac.setMode(Controller::APPROACH1);
+				msg.data = 1;
 				break;
-			
-			case '2':
-				cout << "Approach2" << endl;
+			case HashCode("approach1-2"): // go to short part1
+				ROS_INFO("APPROACH2");
 				ac.setMode(Controller::APPROACH2);
+				msg.data = 2;
 				break;
-			case '3':
-				cout << "Approach3" << endl;
+			case HashCode("approach2-1"): // go to short part1
+				ROS_INFO("APPROACH3");
 				ac.setMode(Controller::APPROACH3);
-			
+				msg.data = 3;
 				break;
-			case '4':
-				cout << "Approach4" << endl;
+			case HashCode("approach2-2"): // go to short part1
+				ROS_INFO("APPROACH4");
 				ac.setMode(Controller::APPROACH4);
-				break;
-			case 'g':
-				cout << "Grasping Milk" << endl;
-				vb.desired_grisping_l = 0.02;
-				break;
-			case '\t':
-				if (isSimulationRun) {
-					cout << "Simulation Pause" << endl;
-					isSimulationRun = false;
-				}
-				else {
-					cout << "Simulation Run" << endl;
-					isSimulationRun = true;
-					//ac.setMode(Controller::DEFAULT);
-				}
-				break;
-			case 'q':
-				isSimulationRun = false;
-				exitFlag = true;
-				break;
+				msg.data =4;
+				break;										
+			case HashCode("approach3-1"): // go to short part1
+				ROS_INFO("APPROACH5");
+				ac.setMode(Controller::APPROACH5);
+				msg.data = 5;
+				break;	
+			case HashCode("approach3-2"): // go to short part1
+				ROS_INFO("APPROACH6");
+				ac.setMode(Controller::APPROACH6);
+				msg.data = 6;
+				break;	
 			
-			}
-			// svb.wait();
+			case HashCode("approach4-1"): // go to short part1
+				ROS_INFO("APPROACH7");
+				ac.setMode(Controller::APPROACH7);
+				msg.data = 7;
+				break;	
+			case HashCode("approach4-2"): // go to short part1
+				ROS_INFO("APPROACH8");
+				ac.setMode(Controller::APPROACH8);
+				msg.data = 8;
+				break;			
 		}
 		
+		
 		if (isSimulationRun) {
+			state_ = 'default';
 			ac.compute();
 			ac.writedata(vb.desired_ql_);
-			vb.write_vrep();
-			vb.wait();
-			
+			vb.write_vrep(); // publish desired q, success
+			vb.wait();		
 		}
 	
 	}

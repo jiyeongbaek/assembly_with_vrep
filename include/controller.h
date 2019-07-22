@@ -12,7 +12,7 @@
 #include <kdl/chainiksolverpos_nr_jl.hpp>
 #include <ros/ros.h>
 #include <ros/node_handle.h>
-
+#include <std_msgs/Bool.h>
 using namespace RigidBodyDynamics;
 using namespace std;
 using namespace Eigen;
@@ -31,6 +31,12 @@ public:
 		APPROACH2,
 		APPROACH3,
 		APPROACH4,
+		APPROACH5,
+		APPROACH6,
+		APPROACH7,
+		APPROACH8,
+		APPROACH9,
+
 		DEFAULT
 	};
 public:
@@ -117,13 +123,15 @@ public:
 	Math::Vector3d joint_position_local_l[dof];
 	Math::Vector3d com_position_l[dof];
 
-
-
+	MatrixXd target;
+	int row1, row2;
 	double playTime_;
 	double Hz_;
 	double controlStartTime_;
 	double current_time;
-
+	double distance = 0;
+	double threshold;
+	
 	Vector3d object_position;
 
 	ARM_CONTROL_MODE controlMode_;
@@ -133,7 +141,7 @@ public:
 	
 	Robotmodel _robot_left, _robot_right;
 	int target_num, target_state;
-	MatrixXd _joint_target;
+	MatrixXd _joint_target, _joint_target2;
 	
 	Eigen::VectorXd init_pose_l, init_pose_r;
 	Matrix3d Rot_l;

@@ -26,6 +26,7 @@
         "optional": "cpp",
         "cwctype": "cpp",
         "mutex": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "iostream": "cpp"
     }
 }

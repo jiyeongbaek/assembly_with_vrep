@@ -16,6 +16,9 @@ struct Robotmodel {
 	shared_ptr<Model> model;
 	VectorXd q;
 	Matrix3d Rot;
+
+	Vector3d refer_pos;
+	Matrix3d refer_rot;
 };
 struct ST_OBB
 {

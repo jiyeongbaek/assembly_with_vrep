@@ -7,13 +7,15 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/Char.h>
+#include <std_msgs/String.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/Point.h>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions>
 #include "controller.h"
-
+#include <string.h>
 #define TOTAL_DOF 9 // 9 dof robot(7 + 2 gripper)
 #define SIM_DT    0.01 // 10ms
 #define PI 3.14159265359
@@ -46,7 +48,7 @@ const std::string GRIPPER_NAME[2] = {"panda_finger_joint1", "panda_finger_joint2
     void read_vrep();
     void write_vrep();
     void wait();
-
+    void success(std_msgs::Int32 msg);
     Eigen::VectorXd current_ql_, current_qr_;
 	Eigen::VectorXd current_ql_dot_, current_qr_dot_;
 	Eigen::VectorXd desired_ql_, desired_qr_;
@@ -56,7 +58,7 @@ const std::string GRIPPER_NAME[2] = {"panda_finger_joint1", "panda_finger_joint2
 	Eigen::Vector3d euler_;
 	Eigen::VectorXd desired_base_vel_, current_base_vel_;
     Eigen::Vector3d current_base_;
-
+    
     private:
     ros::Publisher vrep_ljoint_set_pub_;
 	ros::Publisher vrep_rjoint_set_pub_;
@@ -65,6 +67,7 @@ const std::string GRIPPER_NAME[2] = {"panda_finger_joint1", "panda_finger_joint2
     ros::Publisher vrep_sim_step_trigger_pub_;
     ros::Publisher vrep_sim_enable_syncmode_pub_;
     ros::Publisher vrep_gripper_set_pub;
+    ros::Publisher vrep_success_pub_;
     /**
     * @brief controller to vrep simulator subscriber message lists
     * @param vrep_joint_state_sub_(sensor_msgs::JointState) : get vrep simulator robot current joint value

@@ -93,6 +93,9 @@ Controller::Controller(ros::NodeHandle nh_)
 	model_l->gravity = Vector3d(0., 0, -9.81);
 
 	playTime_ = 0.0;
+	threshold = 0.0;
+	controlMode_ = DEFAULT;
+
 }
 Controller::~Controller()
 {       
@@ -191,12 +194,12 @@ void Controller::compute() {
 	{
 	case INIT:
 		//JointPIDControl(0.1*Hz, false); // false : Right Arm Control, true : Left Arm Control
-		joint_target_left_.q_(0) = 60.0 * DEGREE;
+		joint_target_left_.q_(0) = 0.0 * DEGREE;
 		joint_target_left_.q_(1) = -45.0 * DEGREE;
 		joint_target_left_.q_(2) = 0.0 * DEGREE;
-		joint_target_left_.q_(3) = -120.0 * DEGREE;
+		joint_target_left_.q_(3) = -0.0 * DEGREE;
 		joint_target_left_.q_(4) = 0.0 * DEGREE;
-		joint_target_left_.q_(5) = 90.0 * DEGREE;
+		joint_target_left_.q_(5) = 0.0 * DEGREE;
 		joint_target_left_.q_(6) = 0.0 * DEGREE;
 		JointPIDControl(0.1 * Hz, true);
 
@@ -204,10 +207,81 @@ void Controller::compute() {
 	
 	case APPROACH1:
 		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 3;
+			_rrt.box_num2 = 1; 	
+
+			_rrt.Box1[0].fAxis = Vector3d(0.01, 0.025, 0.135); // axis length 
+			_rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[0].vPos = Vector3d(0.5, -0.25, 0.135); // axis center pos
+
+			// box
+			_rrt.Box1[1].fAxis = Vector3d(2.0, 2.0, 0.02);
+			_rrt.Box1[1].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[1].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[1].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[1].vPos = Vector3d(0.0, -0.0, -0.00);
+
+			_rrt.Box1[2].fAxis = Vector3d(0.01, 0.025, 0.135); // axis length 
+			_rrt.Box1[2].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[2].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[2].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[2].vPos = Vector3d(0.6, -0.25, 0.135);
+
+
+			_rrt.Box2[1].fAxis = Vector3d(0.02, 0.02, 0.20);
+			_rrt.Box2[2].fAxis = Vector3d(0.02, 0.02, 0.20);
+
+			TRAC_IK_solver(Vector4d(0.40, -0.10, 0.14, 1), Vector3d(-M_PI/2.0,0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true); // true -> left planning
+
 			_rrt.box_num = 0;
-			_rrt.box_num2 = 0; 	
-			TRAC_IK_solver(Vector4d(0.38, -0.25, 0.14, 1), Vector3d(0.0,-M_PI/2.0, -M_PI/4.0), true);
-			std::cout << "test" <<std::endl;
+			_rrt.box_num2 = 0; 
+
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			TRAC_IK_solver(Vector4d(0.4, -0.17, 0.14, 1), Vector3d(-M_PI/2.0,0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true); // true -> left planning
+		}
+
+		row1 = _joint_target.rows();
+		row2 = _joint_target2.rows();
+		target.resize(row1+row2, 7);
+		target.topRows(row1) = _joint_target;
+		target.bottomRows(row2) = _joint_target2;
+
+		// target.topLeftCorner(row1, 7) = _joint_target;
+		// target.bottomLeftCorner(row2,7) = _joint_target2;
+
+		joint_flag = false;
+		target_num = target.rows();
+		
+		if (target_num != target_state)
+			joint_target_left_.q_ = target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(1.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+		break;
+
+
+
+	case APPROACH2:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+
+			// _rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			// _rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			// _rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			// _rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			// _rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.025);	
+			TRAC_IK_solver(Vector4d(0.35, -0.121, 0.2, 1), Vector3d(M_PI/2.0, 0.0, M_PI/4.0), true);
 			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true); // true -> left planning
 			// _joint_target : Matrix of configurations (degrees) 
 		}
@@ -217,17 +291,308 @@ void Controller::compute() {
 		if (target_num != target_state)
 			joint_target_left_.q_ = _joint_target.row(target_state) * DEGREE;
 
+		joint_flag = JointPIDControl(1.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+
+		break;
+
+	case APPROACH3:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 2;
+			_rrt.box_num2 = 1; 	
+
+			// _rrt.Box1[0].fAxis = Vector3d(0.01, 0.025, 0.135); // axis length 
+			// _rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			// _rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			// _rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			// _rrt.Box1[0].vPos = Vector3d(0.6, -0.25, 0.135); // axis center pos
+
+			// box
+			_rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			_rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.00);
+
+			_rrt.Box1[1].fAxis = Vector3d(0.01, 0.025, 0.135); // axis length 
+			_rrt.Box1[1].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[1].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[1].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[1].vPos = Vector3d(0.6, -0.25, 0.135);
+
+			TRAC_IK_solver(Vector4d(0.60, -0.1, 0.17, 1), Vector3d(-M_PI/2.0,0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true); // true -> left planning
+			// _joint_target : Matrix of configurations (degrees) 
+			
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			TRAC_IK_solver(Vector4d(0.60, -0.17, 0.17, 1), Vector3d(-M_PI/2.0,0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true); // true -> left planning
+			// _joint_target : Matrix of configurations (degrees) 
+		}
+		row1 = _joint_target.rows();
+		row2 = _joint_target2.rows();
+		target.resize(row1+row2, 7);
+
+		target.topRows(row1) = _joint_target;
+		target.bottomRows(row2) = _joint_target2;
+
+		joint_flag = false;
+		target_num = target.rows();
+
+		//distance = sqrt(pow((_joint_target.row(target_state)(0) - joint_left_.q_(0)), 2) + pow((_joint_target.row(target_state)(1) - joint_left_.q_(1)), 2) + pow((_joint_target.row(target_state)(2) - joint_left_.q_(2)), 2));
+		if (target_num != target_state)
+			joint_target_left_.q_ = target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(1.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+
+		break;
+
+	case APPROACH4:
+		if (controlStartTime_ == playTime_) {
+
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+			TRAC_IK_solver(Vector4d(0.60, -0.17, 0.27, 1), Vector3d(-M_PI/2.0,0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true);
+
+			_rrt.box_num = 1;
+			_rrt.box_num2 = 1; 
+
+			_rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			_rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.025);	
+
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			TRAC_IK_solver(Vector4d(0.72, -0.03, 0.14, 1), Vector3d(M_PI/2.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true); // true -> left planning
+			// _joint_target : Matrix of configurations (degrees) 
+		}
+		row1 = _joint_target.rows();
+		row2 = _joint_target2.rows();
+		target.resize(row1+row2, 7);
+
+		target.topRows(row1) = _joint_target;
+		target.bottomRows(row2) = _joint_target2;
+
+		joint_flag = false;
+		target_num = target.rows();
+
+		//distance = sqrt(pow((_joint_target.row(target_state)(0) - joint_left_.q_(0)), 2) + pow((_joint_target.row(target_state)(1) - joint_left_.q_(1)), 2) + pow((_joint_target.row(target_state)(2) - joint_left_.q_(2)), 2));
+		if (target_num != target_state)
+			joint_target_left_.q_ = target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(1.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+
+		break;
+
+
+	case APPROACH5:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+
+			_rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			_rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.025);	
+
+			TRAC_IK_solver(Vector4d(0.45, 0.275, 0.13, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true); // true -> left planning
+
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			
+			TRAC_IK_solver(Vector4d(0.45, 0.275, 0.08, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true); // true -> left planning
+
+			// _joint_target : Matrix of configurations (degrees) 
+		}
+		row1 = _joint_target.rows();
+		row2 = _joint_target2.rows();
+		target.resize(row1+row2, 7);
+
+		target.topRows(row1) = _joint_target;
+		target.bottomRows(row2) = _joint_target2;
+
+		joint_flag = false;
+		target_num = target.rows();
+
+		//distance = sqrt(pow((_joint_target.row(target_state)(0) - joint_left_.q_(0)), 2) + pow((_joint_target.row(target_state)(1) - joint_left_.q_(1)), 2) + pow((_joint_target.row(target_state)(2) - joint_left_.q_(2)), 2));
+		if (target_num != target_state)
+			joint_target_left_.q_ = target.row(target_state) * DEGREE;
+
 		joint_flag = JointPIDControl(2.0 * Hz, true);
 
 		if (joint_flag && target_state < target_num) {
 			controlStartTime_ = playTime_;
 			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
 			target_state++;
+			
+		}
+	
+	
+		break;
+		case APPROACH6:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+
+			_rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			_rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			_rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			_rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			_rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.025);	
+
+			_rrt.C.resize(6, 2);
+			_rrt.C.setZero(); // max , min
+			_rrt.C(0, 0) = 0.01;
+			_rrt.C(1, 0) = 0.02;
+			_rrt.C(2, 0) = 0.02;
+			_rrt.C(3, 0) = 0.1;
+			_rrt.C(4, 0) = 0.1;
+			_rrt.C(5, 0) = 0.1;
+
+			_rrt.C(0, 1) = -0.01;
+			_rrt.C(1, 1) = -0.01;
+			_rrt.C(2, 1) = -0.02;
+			_rrt.C(3, 1) = -0.1;
+			_rrt.C(4, 1) = -0.1;
+			_rrt.C(5, 1) = -0.1;
+
+			TRAC_IK_solver(Vector4d(0.45, 0.275, 0.20, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+
+			_robot_left.refer_pos(0) = 0.45;
+			_robot_left.refer_pos(1) = 0.275;
+			_robot_left.refer_pos(2) = 0.08;
+			_robot_left.refer_rot = Rotate_with_X(0.0)*Rotate_with_Y(0.0)*Rotate_with_Z(M_PI/4.0);
+			
+			CRRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true);
+			
+			// _rrt.box_num = 1;
+			// _rrt.box_num2 = 0; 
+
+			// _rrt.Box1[0].fAxis = Vector3d(2.0, 2.0, 0.02);
+			// _rrt.Box1[0].vAxis[0] = Vector3d(1, 0, 0);
+			// _rrt.Box1[0].vAxis[1] = Vector3d(0, 1, 0);
+			// _rrt.Box1[0].vAxis[2] = Vector3d(0, 0, 1);
+			// _rrt.Box1[0].vPos = Vector3d(0.0, -0.0, -0.025);	
+			// joint_left_.qInit_ = joint_left_.qGoal_;
+			// TRAC_IK_solver(Vector4d(0.27, 0.425, 0.08, 1), Vector3d(0.0, M_PI/2.0, M_PI/4.0), true);
+			// RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true); // true -> left planning
+			// _joint_target : Matrix of configurations (degrees) 
+		}
+		// row1 = _joint_target.rows();
+		// row2 = _joint_target2.rows();
+		// target.resize(row1+row2, 7);
+
+		// target.topRows(row1) = _joint_target;
+		// target.bottomRows(row2) = _joint_target2;
+
+		joint_flag = false;
+		target_num = _joint_target.rows();
+
+		//distance = sqrt(pow((_joint_target.row(target_state)(0) - joint_left_.q_(0)), 2) + pow((_joint_target.row(target_state)(1) - joint_left_.q_(1)), 2) + pow((_joint_target.row(target_state)(2) - joint_left_.q_(2)), 2));
+		if (target_num != target_state)
+			joint_target_left_.q_ = _joint_target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(0.1* Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
 		}
 	
 		break;
+	case APPROACH7:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+			TRAC_IK_solver(Vector4d(-0.25, 0.5, 0.18, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true); // true -> left planning
+			
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			TRAC_IK_solver(Vector4d(-0.25, 0.5, 0.08, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true);
+		}
+		row1 = _joint_target.rows();
+		row2 = _joint_target2.rows();
+		target.resize(row1+row2, 7);
 
+		target.topRows(row1) = _joint_target;
+		target.bottomRows(row2) = _joint_target2;
 
+		joint_flag = false;
+		target_num = target.rows();
+
+		//distance = sqrt(pow((_joint_target.row(target_state)(0) - joint_left_.q_(0)), 2) + pow((_joint_target.row(target_state)(1) - joint_left_.q_(1)), 2) + pow((_joint_target.row(target_state)(2) - joint_left_.q_(2)), 2));
+		if (target_num != target_state)
+			joint_target_left_.q_ = target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(2.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+	
+
+		break;
+
+	case APPROACH8:
+		if (controlStartTime_ == playTime_) {
+			_rrt.box_num = 0;
+			_rrt.box_num2 = 0; 
+			TRAC_IK_solver(Vector4d(-0.25, 0.5, 0.3, 1), Vector3d(0.0, 0.0, M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target, true);
+
+			joint_left_.qInit_ = joint_left_.qGoal_;
+			TRAC_IK_solver(Vector4d(0.5, 0.0, 0.3, 1), Vector3d(0.0, 0.0, -M_PI/4.0), true);
+			RRT_planning(joint_left_.qInit_, joint_left_.qGoal_, _joint_target2, true);
+		}
+		joint_flag = false;
+		target_num = _joint_target.rows();
+
+		if (target_num != target_state)
+			joint_target_left_.q_ = _joint_target.row(target_state) * DEGREE;
+
+		joint_flag = JointPIDControl(1.0 * Hz, true);
+
+		if (joint_flag && target_state < target_num) {
+			controlStartTime_ = playTime_;
+			joint_left_.qInit_ = joint_left_.q_; // why update qInit ? Because PID controller consider initial state
+			target_state++;
+			
+		}
+
+		break;
 	case DEFAULT:
 		joint_target_left_.desired_q_ = joint_left_.qInit_;
 		joint_target_right_.desired_q_ = joint_right_.qInit_;
@@ -345,7 +710,7 @@ void Controller::TRAC_IK_solver(Vector4d x_pos, Vector3d rot_angle, bool left)
 		end_effector_pose.p(i) = x_pos(i);
 	}
 	Matrix3d Rot_d;
-	Rot_d = Rotate_with_Z(rot_angle(0))*Rotate_with_Y(rot_angle(1))*Rotate_with_Z(rot_angle(2));
+	Rot_d = Rotate_with_X(rot_angle(0))*Rotate_with_Y(rot_angle(1))*Rotate_with_Z(rot_angle(2));
 	
 	KDL::Rotation A;
 	A.data[0] = Rot_d(0,0); 
@@ -446,7 +811,7 @@ void Controller::RRT_planning(VectorXd q_start, VectorXd q_goal, MatrixXd& joint
 	while (!a)
 		if (left)
 		{	
-			std::cout << "test2" << std::endl;
+			
 			a = _rrt.StartRRT2(_robot_left, outFile);
 			}
 		else
@@ -492,7 +857,7 @@ void Controller::RRT_planning(VectorXd q_start, VectorXd q_goal, MatrixXd& joint
 }
 void Controller::CRRT_planning(VectorXd q_start, VectorXd q_goal, MatrixXd& joint_target, bool left)
 {
-	for (int i = 0; i < dof; i++) {
+		for (int i = 0; i < dof; i++) {
 		joint_limit_left_.lower(i) = -166.0;
 		joint_limit_left_.upper(i) = 166.0;
 	}
@@ -540,7 +905,6 @@ void Controller::CRRT_planning(VectorXd q_start, VectorXd q_goal, MatrixXd& join
 	}
 	_rrt.qinit = q_start;
 	_rrt.qgoal = q_goal;
-
 	ofstream outFile("path_result.txt", ios::out);
 	bool a = false;
 	while (!a)
@@ -548,13 +912,13 @@ void Controller::CRRT_planning(VectorXd q_start, VectorXd q_goal, MatrixXd& join
 			a = _rrt.StartCRRT(_robot_left, outFile);
 		else
 			a = _rrt.StartCRRT(_robot_right, outFile);
-	ofstream outFile2("path_result2.txt", ios::out);
+	// ofstream outFile2("path_result2.txt", ios::out);
 
-	ifstream inFile("path_result.txt");
+	// ifstream inFile("path_result.txt");
 	//_rrt.SmoothCPath(outFile2, inFile);
-	inFile.close();
+	//inFile.close();
 	//cout << "3" << endl;
-	outFile2.close();
+	outFile.close();
 	MatrixXd joint_temp(5000, dof);
 	if (!left)
 		joint_temp.resize(5000, dof);
